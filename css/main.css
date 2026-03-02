@@ -80,6 +80,87 @@ html, body {
     margin: 0;
 }
 
+#task-panel-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.task-tab {
+    flex: 1 1 auto;
+    background-color: #1a1200;
+    border: 1px solid #4a3200;
+    border-radius: 4px 4px 0 0;
+    color: #8a7040;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 5px 8px;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+.task-tab:hover {
+    background-color: #2a1e00;
+    color: #c8a040;
+}
+.task-tab-active {
+    background-color: #3a2600;
+    border-color: #ffd700;
+    color: #ffd700;
+}
+
+/* ── Completion checkbox ─────────────────────────────────────────── */
+.task-card-check {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    padding: 2px 6px 2px 0;
+    cursor: pointer;
+}
+.task-card-checkbox {
+    accent-color: #ffd700;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    margin: 0;
+}
+
+/* ── Completed card style ────────────────────────────────────────── */
+.task-card-completed {
+    opacity: 0.55;
+    border-color: #2a2200;
+    background-color: #181000;
+    cursor: default;
+}
+.task-card-completed .task-card-name {
+    color: #806830;
+    text-decoration: line-through;
+}
+.task-card-completed .task-card-points {
+    background-color: #2a2000;
+    color: #6a5820;
+}
+
+.task-reset-btn {
+    flex: 0 0 auto;
+    align-self: stretch;
+    background-color: #3a1400;
+    border: 1px solid #8b2000;
+    border-radius: 4px;
+    color: #e06030;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    text-align: center;
+    margin-bottom: 4px;
+}
+.task-reset-btn:hover {
+    background-color: #5a1e00;
+    border-color: #c04000;
+    color: #ff8050;
+}
+
 #task-panel-stats {
     flex: 0 0 auto;
     padding: 6px 10px;
