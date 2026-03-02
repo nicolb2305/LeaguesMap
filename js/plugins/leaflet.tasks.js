@@ -13,7 +13,7 @@ const STORAGE_KEY = 'league_tasks_completed';
 let allTasks = [];
 let currentSearch = '';
 let currentRegions = null;
-let showGeneralTasks = true;
+let showGeneralTasks = false;
 let selectedTaskName = null;
 let activeTab = 'active'; // 'active' | 'completed'
 
@@ -25,7 +25,7 @@ try {
 } catch (e) { /* ignore */ }
 
 function saveCompleted() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(completedTasks)));
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(completedTasks))); } catch (e) { /* storage unavailable */ }
 }
 
 // ── DOM references ────────────────────────────────────────────────

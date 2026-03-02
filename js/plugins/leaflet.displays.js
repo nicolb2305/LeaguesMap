@@ -16,6 +16,90 @@ export default void function (factory) {
     }
 }
 (function (L) {
+    // ── Ground item spawns layer ──────────────────────────────
+    L.ItemSpawns = L.LayerGroup.extend({
+        initialize: function (options) {
+            L.LayerGroup.prototype.initialize.call(this);
+            L.setOptions(this, options);
+        },
+
+        onAdd: function (map) {
+            this._map = map;
+            if (this.options.name) {
+                this.getData(this.options.name)
+                    .then(locations => {
+                        this.createMarkers(locations);
+                        if (typeof this.options.onSpawnsLoaded === 'function') {
+                            this.options.onSpawnsLoaded(locations);
+                        }
+                    }).catch(error => {
+                        console.error('L.ItemSpawns error:', error);
+                    });
+            }
+        },
+
+        getData: async function (name) {
+            let data = await fetch(`${this.options.folder}/item_spawns.json`)
+                .then(res => res.json(), _ => { throw new Error(`Unable to fetch ${this.options.folder}/item_spawns.json`); });
+
+            let hasRegionFilter = Array.isArray(this.options.regions);
+            let regionFilter = hasRegionFilter && this.options.regions.length > 0
+                ? new Set(this.options.regions.map(r => r.toLowerCase()))
+                : null;
+
+            let isStrict = this.options.strict === true;
+            let searchLower = name.toLowerCase();
+
+            return data.filter(item => {
+                if (!item.page_name || !item.coordinates || item.coordinates.length === 0) return false;
+                let nameLower = item.page_name.toLowerCase();
+                let nameMatches = isStrict ? nameLower === searchLower : nameLower.includes(searchLower);
+                if (!nameMatches) return false;
+                if (hasRegionFilter && !regionFilter) return false;
+                if (regionFilter) {
+                    if (!item.leagueregion || item.leagueregion.length === 0) return false;
+                    return item.leagueregion.some(region => regionFilter.has(region.toLowerCase()));
+                }
+                return true;
+            });
+        },
+
+        createMarkers: function (data) {
+            data.forEach(item => {
+                if (item.coordinates && item.coordinates.length > 0) {
+                    item.coordinates.forEach(coord => {
+                        let marker = L.circleMarker([coord[1] + 0.5, coord[0] + 0.5], {
+                            radius: 8,
+                            fillColor: '#cc0000',
+                            color: '#660000',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.85
+                        });
+                        let popupContent = `<div style="min-width: 200px;">`;
+                        popupContent += `<b><a href="https://oldschool.runescape.wiki/w/${item.page_name.replace(/ /g, '_')}" target="_blank" style="color: #0645ad;">${item.page_name}</a></b> <span style="color:#cc0000;">(Ground spawn)</span><br>`;
+                        if (item.leagueregion && item.leagueregion.length > 0) {
+                            popupContent += `Regions: ${item.leagueregion.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ')}<br>`;
+                        }
+                        popupContent += `x = ${coord[0]}<br>y = ${coord[1]}<br></div>`;
+                        marker.bindPopup(popupContent, { autoPan: false });
+                        this.addLayer(marker);
+                    });
+                }
+            });
+        },
+
+        onRemove: function (map) {
+            this.clearLayers();
+            L.LayerGroup.prototype.onRemove.call(this, map);
+        }
+    });
+
+    L.itemSpawns = function (options) {
+        return new L.ItemSpawns(options);
+    };
+
+    // ── Display controls ──────────────────────────────────────
     L.Control.Display = L.Control.extend({
             onAdd: function (map) {
                 this._map = map;
@@ -341,16 +425,16 @@ export default void function (factory) {
                 { name: 'Wilderness', icon: 'images/region_badges/Wilderness_Area_Badge.png' },
             ];
 
-            // Load enabled regions from localStorage or default to all
-            let savedRegions = localStorage.getItem('storeline_enabled_regions');
-            if (savedRegions) {
-                try {
+            // Load enabled regions from localStorage or default to Varlamore only
+            try {
+                let savedRegions = localStorage.getItem('storeline_enabled_regions');
+                if (savedRegions) {
                     this._enabledRegions = new Set(JSON.parse(savedRegions));
-                } catch (e) {
-                    this._enabledRegions = new Set(regions.map(region => region.name));
+                } else {
+                    this._enabledRegions = new Set(['Varlamore']);
                 }
-            } else {
-                this._enabledRegions = new Set(regions.map(region => region.name));
+            } catch (e) {
+                this._enabledRegions = new Set(['Varlamore']);
             }
 
             this._buttons = {};
@@ -394,7 +478,7 @@ export default void function (factory) {
                     }
 
                     // Save to localStorage
-                    localStorage.setItem('storeline_enabled_regions', JSON.stringify(Array.from(this._enabledRegions)));
+                    try { localStorage.setItem('storeline_enabled_regions', JSON.stringify(Array.from(this._enabledRegions))); } catch (e) { /* storage unavailable */ }
 
                     // Notify callbacks
                     this._callbacks.forEach(callback => callback(Array.from(this._enabledRegions)));
@@ -604,9 +688,13 @@ export default void function (factory) {
                 nameInput.setAttribute('autocomplete', 'off');
                 nameInput.setAttribute('placeholder', 'Search for items, NPCs, or objects...');
 
-                // Checkboxes container
-                let checkboxContainer = L.DomUtil.create('div', 'leaflet-control-display-checkboxes', searchForm);
-                checkboxContainer.style.cssText = 'display: flex; gap: 15px; margin-top: 10px; flex-wrap: wrap;';
+                // Checkboxes + mejrs link row
+                let checkboxRow = L.DomUtil.create('div', 'leaflet-control-display-checkboxes', searchForm);
+                checkboxRow.style.cssText = 'display: flex; gap: 10px; margin-top: 10px; align-items: flex-start; justify-content: space-between;';
+
+                // Left column: checkboxes
+                let checkboxContainer = L.DomUtil.create('div', '', checkboxRow);
+                checkboxContainer.style.cssText = 'display: flex; gap: 15px; flex-wrap: wrap; align-items: center;';
 
                 // Shops/Items checkbox
                 let shopsCheckbox = this.createCheckbox('shops', 'Shops items', true);
@@ -623,6 +711,42 @@ export default void function (factory) {
                 // Strict filter checkbox
                 let strictCheckbox = this.createCheckbox('strict', 'Strict search', false);
                 checkboxContainer.appendChild(strictCheckbox.container);
+
+                // Right column: external link buttons
+                let mejrsCol = L.DomUtil.create('div', '', checkboxRow);
+                mejrsCol.style.cssText = 'display: flex; align-items: center; flex-shrink: 0; gap: 5px;';
+
+                const btnStyle = 'display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 11px; white-space: nowrap; cursor: pointer; text-decoration: none; border: 1px solid #888; border-radius: 3px; background: #f5f0e8; color: #333;';
+
+                let mejrsBtn = L.DomUtil.create('a', 'leaflet-control-display-mejrs-btn', mejrsCol);
+                mejrsBtn.setAttribute('target', '_blank');
+                mejrsBtn.setAttribute('rel', 'noopener');
+                mejrsBtn.setAttribute('title', 'View on mejrs.github.io');
+                mejrsBtn.innerHTML = 'View on mejrs ↗';
+                mejrsBtn.style.cssText = btnStyle;
+
+                let wikiBtn = L.DomUtil.create('a', 'leaflet-control-display-wiki-btn', mejrsCol);
+                wikiBtn.setAttribute('target', '_blank');
+                wikiBtn.setAttribute('rel', 'noopener');
+                wikiBtn.setAttribute('title', 'View on OSRS Wiki');
+                wikiBtn.style.cssText = btnStyle;
+                wikiBtn.innerHTML = '<img src="https://oldschool.runescape.wiki/images/Favicon.ico" style="width:12px;height:12px;vertical-align:middle;"> Wiki ↗';
+
+                const updateExternalLinks = () => {
+                    let term = nameInput.value.trim();
+                    let center = this._map.getCenter();
+                    let x = Math.floor(center.lng);
+                    let y = Math.floor(center.lat);
+                    let z = this._map.getZoom();
+                    let p = this._map._plane || 0;
+                    mejrsBtn.href = `https://mejrs.github.io/osrs.html?object=${encodeURIComponent(term)}&m=-1&z=${z}&p=${p}&x=${x}&y=${y}`;
+                    wikiBtn.href = `https://oldschool.runescape.wiki/w/${encodeURIComponent(term.replace(/ /g, '_'))}`;
+                };
+
+                updateExternalLinks();
+                nameInput.addEventListener('input', updateExternalLinks);
+                this._map.on('move zoom', updateExternalLinks);
+                this._map.on('planechange', updateExternalLinks);
 
                 // Store references
                 this._checkboxes = {
@@ -707,6 +831,7 @@ export default void function (factory) {
             _objectmap: undefined,
             _npcmap: undefined,
             _storemap: undefined,
+            _spawnmap: undefined,
 
             // Programmatically trigger a search from external code (e.g. task panel).
             // Sets the search input value, optionally enables strict mode, then runs the search.
@@ -771,11 +896,18 @@ export default void function (factory) {
                     this.initializeEmptyList(this._npcListContainer, 'NPCs', false);
                 }
 
-                // Shops search
+                // Shops + ground spawns search
                 if (this._checkboxes.shops.checked) {
-                    if (this._storemap) {
-                        this._storemap.remove();
-                    }
+                    if (this._storemap) { this._storemap.remove(); this._storemap = undefined; }
+                    if (this._spawnmap) { this._spawnmap.remove(); this._spawnmap = undefined; }
+
+                    // Set up two subsections inside the shared item list container
+                    this._itemListContainer.innerHTML = '';
+                    this._shopSubContainer = L.DomUtil.create('div', '', this._itemListContainer);
+                    this._spawnSubContainer = L.DomUtil.create('div', '', this._itemListContainer);
+                    this.initializeEmptyList(this._shopSubContainer, 'Shops', true);
+                    this.initializeEmptyList(this._spawnSubContainer, 'Ground Items', true);
+
                     this._storemap = L.storeline({
                         name: term,
                         folder: this.options.folder,
@@ -785,33 +917,38 @@ export default void function (factory) {
                             this.populateItemList(items, itemMap);
                         }
                     }).addTo(this._map);
+
+                    this._spawnmap = L.itemSpawns({
+                        name: term,
+                        folder: this.options.folder,
+                        regions: regions,
+                        strict: this._checkboxes.strict.checked,
+                        onSpawnsLoaded: (data) => {
+                            this.populateSpawnList(data);
+                        }
+                    }).addTo(this._map);
                 } else {
-                    if (this._storemap) {
-                        this._storemap.remove();
-                        this._storemap = undefined;
-                    }
+                    if (this._storemap) { this._storemap.remove(); this._storemap = undefined; }
+                    if (this._spawnmap) { this._spawnmap.remove(); this._spawnmap = undefined; }
+                    this._shopSubContainer = undefined;
+                    this._spawnSubContainer = undefined;
                     this.initializeEmptyList(this._itemListContainer, 'Shops/Items', false);
                 }
             },
 
             clearSearch: function () {
-                if (this._objectmap) {
-                    this._objectmap.remove();
-                    this._objectmap = undefined;
-                }
-                if (this._npcmap) {
-                    this._npcmap.remove();
-                    this._npcmap = undefined;
-                }
-                if (this._storemap) {
-                    this._storemap.remove();
-                    this._storemap = undefined;
-                }
+                if (this._objectmap) { this._objectmap.remove(); this._objectmap = undefined; }
+                if (this._npcmap) { this._npcmap.remove(); this._npcmap = undefined; }
+                if (this._storemap) { this._storemap.remove(); this._storemap = undefined; }
+                if (this._spawnmap) { this._spawnmap.remove(); this._spawnmap = undefined; }
+                this._shopSubContainer = undefined;
+                this._spawnSubContainer = undefined;
                 // Reset location indices
                 this._itemLocationIndices = {};
                 this._npcLocationIndices = {};
                 this._objectLocationIndices = {};
-                
+                this._spawnLocationIndices = {};
+
                 this.initializeEmptyList(this._itemListContainer, 'Shops/Items', true);
                 this.initializeEmptyList(this._npcListContainer, 'NPCs', true);
                 this.initializeEmptyList(this._objectListContainer, 'Objects', true);
@@ -836,60 +973,100 @@ export default void function (factory) {
             },
 
             populateItemList: function (items, itemMap) {
-                if (!this._itemListContainer) return;
-                
-                this._itemListContainer.innerHTML = '';
+                let container = this._shopSubContainer || this._itemListContainer;
+                if (!container) return;
+
+                container.innerHTML = '';
                 this._itemLocationIndices = {};
-                
-                let listTitle = L.DomUtil.create('div', 'leaflet-control-display-item-list-title', this._itemListContainer);
-                listTitle.innerHTML = `<b>Shops/Items (${items.length})</b>`;
-                
-                let listContent = L.DomUtil.create('div', 'leaflet-control-display-item-list-content', this._itemListContainer);
+
+                let listTitle = L.DomUtil.create('div', 'leaflet-control-display-item-list-title', container);
+                listTitle.innerHTML = `<b>Shops (${items.length})</b>`;
+
+                let listContent = L.DomUtil.create('div', 'leaflet-control-display-item-list-content', container);
                 listContent.style.cssText = 'max-height: 300px; overflow-y: auto;';
-                
+
                 if (items.length === 0) {
                     listContent.style.cssText += ' padding: 0.7em; text-align: center; color: #999;';
                     listContent.innerHTML = 'No results';
                     return;
                 }
-                
+
                 items.forEach(itemName => {
                     let storeLocations = itemMap.has(itemName) ? itemMap.get(itemName) : [];
                     let locationCount = storeLocations.length;
-                    
+
                     let listItem = L.DomUtil.create('div', 'leaflet-control-display-item-list-item', listContent);
                     listItem.innerHTML = `${itemName} (${locationCount})`;
                     listItem.setAttribute('data-item', itemName);
-                    
-                    // Initialize location index for this item
+
                     this._itemLocationIndices[itemName] = 0;
-                    
+
                     listItem.addEventListener('click', () => {
-                        // Remove previous selection
                         let prevSelected = listContent.querySelector('.is-selected');
-                        if (prevSelected && prevSelected !== listItem) {
-                            prevSelected.classList.remove('is-selected');
-                        }
-                        
-                        // Add selection
+                        if (prevSelected && prevSelected !== listItem) prevSelected.classList.remove('is-selected');
                         listItem.classList.add('is-selected');
-                        
-                        // Update storeline highlighting
+
                         if (this._storemap && this._storemap.setSelectedItem) {
                             this._storemap.setSelectedItem(itemName);
                         }
-                        
-                        // Cycle through locations
+
                         if (storeLocations.length > 0) {
                             let currentIndex = this._itemLocationIndices[itemName];
                             let location = storeLocations[currentIndex];
-                            
                             if (location.position) {
                                 this._map.setView([location.position.y + 0.5, location.position.x + 0.5], .5);
                             }
-                            
-                            // Increment and wrap around
                             this._itemLocationIndices[itemName] = (currentIndex + 1) % storeLocations.length;
+                        }
+                    });
+                });
+            },
+
+            populateSpawnList: function (data) {
+                let container = this._spawnSubContainer;
+                if (!container) return;
+
+                container.innerHTML = '';
+                this._spawnLocationIndices = {};
+
+                // Group by page_name
+                let spawnMap = new Map();
+                data.forEach(item => {
+                    if (!spawnMap.has(item.page_name)) spawnMap.set(item.page_name, []);
+                    item.coordinates.forEach(coord => spawnMap.get(item.page_name).push({ x: coord[0], y: coord[1] }));
+                });
+
+                let totalSpots = data.reduce((sum, item) => sum + item.coordinates.length, 0);
+
+                let listTitle = L.DomUtil.create('div', 'leaflet-control-display-item-list-title', container);
+                listTitle.innerHTML = `<b>Ground Items (${totalSpots})</b>`;
+
+                let listContent = L.DomUtil.create('div', 'leaflet-control-display-item-list-content', container);
+                listContent.style.cssText = 'max-height: 300px; overflow-y: auto;';
+
+                if (spawnMap.size === 0) {
+                    listContent.style.cssText += ' padding: 0.7em; text-align: center; color: #999;';
+                    listContent.innerHTML = 'No results';
+                    return;
+                }
+
+                [...spawnMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([name, coords]) => {
+                    let listItem = L.DomUtil.create('div', 'leaflet-control-display-item-list-item', listContent);
+                    listItem.innerHTML = `${name} (${coords.length}) <span style="color:#cc0000; font-size:10px;">&#9679;</span>`;
+                    listItem.setAttribute('data-item', name);
+
+                    this._spawnLocationIndices[name] = 0;
+
+                    listItem.addEventListener('click', () => {
+                        let prevSelected = listContent.querySelector('.is-selected');
+                        if (prevSelected && prevSelected !== listItem) prevSelected.classList.remove('is-selected');
+                        listItem.classList.add('is-selected');
+
+                        if (coords.length > 0) {
+                            let idx = this._spawnLocationIndices[name];
+                            let pos = coords[idx];
+                            this._map.setView([pos.y + 0.5, pos.x + 0.5], 0.5);
+                            this._spawnLocationIndices[name] = (idx + 1) % coords.length;
                         }
                     });
                 });
