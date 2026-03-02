@@ -2293,7 +2293,8 @@
     "points": 10,
     "completion": "77.6%",
     "strategy": {
-      "search": "Guard (Varlamore)"
+      "search": "",
+      "points": "1641,9571"
     }
   },
   {
