@@ -16,6 +16,7 @@ let currentRegions = null;
 let showGeneralTasks = false;
 let selectedTaskName = null;
 let activeTab = 'active'; // 'active' | 'completed'
+let taskPointsLayer = null; // L.LayerGroup of strategy point markers
 
 // Persisted set of completed task names
 let completedTasks = new Set();
@@ -26,6 +27,56 @@ try {
 
 function saveCompleted() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(completedTasks))); } catch (e) { /* storage unavailable */ }
+}
+
+// ── Strategy point markers ────────────────────────────────────────
+function parseStrategyPoints(pointsStr) {
+    // Expects "x1,y1,x2,y2,..." pairs
+    const nums = pointsStr.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+    const coords = [];
+    for (let i = 0; i + 1 < nums.length; i += 2) {
+        coords.push({ x: nums[i], y: nums[i + 1] });
+    }
+    return coords;
+}
+
+function clearTaskPoints() {
+    if (taskPointsLayer) {
+        const map = window.runescape_map;
+        if (map) map.removeLayer(taskPointsLayer);
+        taskPointsLayer = null;
+    }
+}
+
+function drawTaskPoints(task) {
+    clearTaskPoints();
+    const pointsStr = task.strategy && task.strategy.points ? task.strategy.points.trim() : '';
+    if (!pointsStr) return;
+
+    const map = window.runescape_map;
+    const L = window.L;
+    if (!map || !L) return;
+
+    const coords = parseStrategyPoints(pointsStr);
+    if (coords.length === 0) return;
+
+    const popupHtml = `<div style="min-width:180px;"><b>${escHtml(task.name)}</b><br>${escHtml(task.task)}</div>`;
+
+    taskPointsLayer = L.layerGroup();
+    coords.forEach(({ x, y }) => {
+        const marker = L.marker([y + 0.5, x + 0.5], {
+            icon: L.icon({
+                iconUrl: 'images/marker-icon.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            })
+        });
+        marker.bindPopup(popupHtml, { autoPan: false });
+        taskPointsLayer.addLayer(marker);
+    });
+    taskPointsLayer.addTo(map);
 }
 
 // ── DOM references ────────────────────────────────────────────────
@@ -108,9 +159,15 @@ function buildCard(task, isCompleted) {
     }
 
     const searchTerm = task.strategy && task.strategy.search ? task.strategy.search.trim() : '';
-    if (!isCompleted && searchTerm) {
+    const pointsStr  = task.strategy && task.strategy.points ? task.strategy.points.trim() : '';
+    const strictSearch = !(task.strategy && task.strategy.no_strict);
+    const hasStrategy = !isCompleted && (searchTerm || pointsStr);
+    if (hasStrategy) {
         card.classList.add('task-card-has-strategy');
-        card.title = `Click to search: "${searchTerm}"`;
+        const hints = [];
+        if (searchTerm) hints.push(`Search: "${searchTerm}"${strictSearch ? '' : ' (partial)'}`);
+        if (pointsStr) hints.push('Show pins');
+        card.title = `Click to: ${hints.join(' + ')}`;
     }
 
     const areaHtml = task.area
@@ -137,6 +194,7 @@ function buildCard(task, isCompleted) {
         `<div class="task-card-meta">` +
             areaHtml +
             (searchTerm ? `<span class="task-card-strategy-hint">🔍 ${escHtml(searchTerm)}</span>` : '') +
+            (pointsStr  ? `<span class="task-card-strategy-hint">📍 ${parseStrategyPoints(pointsStr).length} pin(s)</span>` : '') +
             `<span class="task-card-completion">${escHtml(task.completion)} players</span>` +
         `</div>`;
 
@@ -145,7 +203,10 @@ function buildCard(task, isCompleted) {
         const name = e.target.dataset.name;
         if (e.target.checked) {
             completedTasks.add(name);
-            if (selectedTaskName === name) selectedTaskName = null;
+            if (selectedTaskName === name) {
+                selectedTaskName = null;
+                clearTaskPoints();
+            }
         } else {
             completedTasks.delete(name);
         }
@@ -154,14 +215,19 @@ function buildCard(task, isCompleted) {
         renderTasks();
     });
 
-    // Card body click (selection + strategy search) — only on active tab
+    // Card body click (selection + strategy) — only on active tab
     if (!isCompleted) {
         card.addEventListener('click', () => {
-            selectedTaskName = (selectedTaskName === task.name) ? null : task.name;
+            const wasSelected = selectedTaskName === task.name;
+            selectedTaskName = wasSelected ? null : task.name;
+            clearTaskPoints(); // always clear previous pins on any click
+            // Always clear search first, then apply new task's strategy if selecting
+            const ctrl = window._unifiedSearch;
+            if (ctrl && ctrl.triggerSearch) ctrl.triggerSearch('', false);
             renderTasks();
-            if (searchTerm) {
-                const ctrl = window._unifiedSearch;
-                if (ctrl && ctrl.triggerSearch) ctrl.triggerSearch(searchTerm, true);
+            if (!wasSelected) {
+                if (searchTerm && ctrl && ctrl.triggerSearch) ctrl.triggerSearch(searchTerm, strictSearch);
+                if (pointsStr) drawTaskPoints(task);
             }
         });
     }

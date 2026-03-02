@@ -28,6 +28,7 @@ export default void function (factory) {
             if (this.options.name) {
                 this.getData(this.options.name)
                     .then(locations => {
+                        if (!this._map) return;
                         this.createMarkers(locations);
                         if (typeof this.options.onSpawnsLoaded === 'function') {
                             this.options.onSpawnsLoaded(locations);
@@ -762,7 +763,7 @@ export default void function (factory) {
                 // Search on input change
                 nameInput.addEventListener('input', (e) => {
                     let term = e.target.value.trim();
-                    if (term) {
+                    if (term.length >= 3) {
                         this.performSearch(term);
                     } else {
                         this.clearSearch();
@@ -773,7 +774,7 @@ export default void function (factory) {
                 [shopsCheckbox.input, npcsCheckbox.input, objectsCheckbox.input, strictCheckbox.input].forEach(checkbox => {
                     checkbox.addEventListener('change', () => {
                         let term = nameInput.value.trim();
-                        if (term) {
+                        if (term.length >= 3) {
                             this.performSearch(term);
                         }
                     });
@@ -783,7 +784,7 @@ export default void function (factory) {
                 if (this._regionControl) {
                     this._regionControl.onRegionChange(() => {
                         let currentTerm = nameInput.value.trim();
-                        if (currentTerm) {
+                        if (currentTerm.length >= 3) {
                             this.performSearch(currentTerm);
                         }
                     });
@@ -828,10 +829,10 @@ export default void function (factory) {
                 return { container: container, input: input };
             },
 
-            _objectmap: undefined,
-            _npcmap: undefined,
-            _storemap: undefined,
-            _spawnmap: undefined,
+            _objectmaps: [],
+            _npcmaps: [],
+            _storemaps: [],
+            _spawnmaps: [],
 
             // Programmatically trigger a search from external code (e.g. task panel).
             // Sets the search input value, optionally enables strict mode, then runs the search.
@@ -846,61 +847,79 @@ export default void function (factory) {
             },
 
             performSearch: function (term) {
+                // Split on commas, but not commas inside parentheses
+                const splitTerms = [];
+                let depth = 0, current = '';
+                for (const ch of term) {
+                    if (ch === '(') { depth++; current += ch; }
+                    else if (ch === ')') { depth = Math.max(0, depth - 1); current += ch; }
+                    else if (ch === ',' && depth === 0) { splitTerms.push(current); current = ''; }
+                    else { current += ch; }
+                }
+                if (current) splitTerms.push(current);
+                const terms = splitTerms.map(t => t.trim()).filter(t => t.length >= 3);
+                if (terms.length === 0) return;
+                const n = terms.length;
                 let regions = this._regionControl ? this._regionControl.getEnabledRegions() : [];
+                const strict = this._checkboxes.strict.checked;
 
-                this.setSearchParams({
-                    search: term
-                });
+                this.setSearchParams({ search: term });
+
+                // Helper to remove all layers in an array
+                const clearLayers = arr => { arr.forEach(l => l.remove()); arr.length = 0; };
 
                 // Objects search
+                clearLayers(this._objectmaps);
                 if (this._checkboxes.objects.checked) {
-                    if (this._objectmap) {
-                        this._objectmap.remove();
-                    }
-                    this._objectmap = L.scenery({
-                        name: term,
-                        folder: this.options.folder,
-                        regions: regions,
-                        strict: this._checkboxes.strict.checked,
-                        onObjectsLoaded: (objects, data) => {
-                            this.populateObjectList(objects, data);
-                        }
-                    }).addTo(this._map);
+                    let pending = n;
+                    let allLocations = [];
+                    terms.forEach(t => {
+                        this._objectmaps.push(L.scenery({
+                            name: t,
+                            folder: this.options.folder,
+                            regions: regions,
+                            strict: strict,
+                            onObjectsLoaded: (objects, data) => {
+                                allLocations.push(...data);
+                                if (--pending === 0) {
+                                    const names = [...new Set(allLocations.map(o => o.page_name))].sort();
+                                    this.populateObjectList(names, allLocations);
+                                }
+                            }
+                        }).addTo(this._map));
+                    });
                 } else {
-                    if (this._objectmap) {
-                        this._objectmap.remove();
-                        this._objectmap = undefined;
-                    }
                     this.initializeEmptyList(this._objectListContainer, 'Objects', false);
                 }
 
                 // NPCs search
+                clearLayers(this._npcmaps);
                 if (this._checkboxes.npcs.checked) {
-                    if (this._npcmap) {
-                        this._npcmap.remove();
-                    }
-                    this._npcmap = L.npcs({
-                        name: term,
-                        folder: this.options.folder,
-                        regions: regions,
-                        strict: this._checkboxes.strict.checked,
-                        onNPCsLoaded: (npcs, data) => {
-                            this.populateNPCList(npcs, data);
-                        }
-                    }).addTo(this._map);
+                    let pending = n;
+                    let allLocations = [];
+                    terms.forEach(t => {
+                        this._npcmaps.push(L.npcs({
+                            name: t,
+                            folder: this.options.folder,
+                            regions: regions,
+                            strict: strict,
+                            onNPCsLoaded: (npcs, data) => {
+                                allLocations.push(...data);
+                                if (--pending === 0) {
+                                    const names = [...new Set(allLocations.map(o => o.page_name))].sort();
+                                    this.populateNPCList(names, allLocations);
+                                }
+                            }
+                        }).addTo(this._map));
+                    });
                 } else {
-                    if (this._npcmap) {
-                        this._npcmap.remove();
-                        this._npcmap = undefined;
-                    }
                     this.initializeEmptyList(this._npcListContainer, 'NPCs', false);
                 }
 
                 // Shops + ground spawns search
+                clearLayers(this._storemaps);
+                clearLayers(this._spawnmaps);
                 if (this._checkboxes.shops.checked) {
-                    if (this._storemap) { this._storemap.remove(); this._storemap = undefined; }
-                    if (this._spawnmap) { this._spawnmap.remove(); this._spawnmap = undefined; }
-
                     // Set up two subsections inside the shared item list container
                     this._itemListContainer.innerHTML = '';
                     this._shopSubContainer = L.DomUtil.create('div', '', this._itemListContainer);
@@ -908,28 +927,40 @@ export default void function (factory) {
                     this.initializeEmptyList(this._shopSubContainer, 'Shops', true);
                     this.initializeEmptyList(this._spawnSubContainer, 'Ground Items', true);
 
-                    this._storemap = L.storeline({
-                        name: term,
-                        folder: this.options.folder,
-                        regions: regions,
-                        strict: this._checkboxes.strict.checked,
-                        onItemsLoaded: (items, itemMap) => {
-                            this.populateItemList(items, itemMap);
-                        }
-                    }).addTo(this._map);
+                    let shopPending = n;
+                    let allShopItems = [];
+                    let allShopMap = new Map();
+                    terms.forEach(t => {
+                        this._storemaps.push(L.storeline({
+                            name: t,
+                            folder: this.options.folder,
+                            regions: regions,
+                            strict: strict,
+                            onItemsLoaded: (items, itemMap) => {
+                                items.forEach(name => {
+                                    if (!allShopMap.has(name)) { allShopItems.push(name); allShopMap.set(name, []); }
+                                    itemMap.get(name).forEach(loc => allShopMap.get(name).push(loc));
+                                });
+                                if (--shopPending === 0) this.populateItemList(allShopItems, allShopMap);
+                            }
+                        }).addTo(this._map));
+                    });
 
-                    this._spawnmap = L.itemSpawns({
-                        name: term,
-                        folder: this.options.folder,
-                        regions: regions,
-                        strict: this._checkboxes.strict.checked,
-                        onSpawnsLoaded: (data) => {
-                            this.populateSpawnList(data);
-                        }
-                    }).addTo(this._map);
+                    let spawnPending = n;
+                    let allSpawnData = [];
+                    terms.forEach(t => {
+                        this._spawnmaps.push(L.itemSpawns({
+                            name: t,
+                            folder: this.options.folder,
+                            regions: regions,
+                            strict: strict,
+                            onSpawnsLoaded: (data) => {
+                                allSpawnData.push(...data);
+                                if (--spawnPending === 0) this.populateSpawnList(allSpawnData);
+                            }
+                        }).addTo(this._map));
+                    });
                 } else {
-                    if (this._storemap) { this._storemap.remove(); this._storemap = undefined; }
-                    if (this._spawnmap) { this._spawnmap.remove(); this._spawnmap = undefined; }
                     this._shopSubContainer = undefined;
                     this._spawnSubContainer = undefined;
                     this.initializeEmptyList(this._itemListContainer, 'Shops/Items', false);
@@ -937,10 +968,11 @@ export default void function (factory) {
             },
 
             clearSearch: function () {
-                if (this._objectmap) { this._objectmap.remove(); this._objectmap = undefined; }
-                if (this._npcmap) { this._npcmap.remove(); this._npcmap = undefined; }
-                if (this._storemap) { this._storemap.remove(); this._storemap = undefined; }
-                if (this._spawnmap) { this._spawnmap.remove(); this._spawnmap = undefined; }
+                const clearLayers = arr => { arr.forEach(l => l.remove()); arr.length = 0; };
+                clearLayers(this._objectmaps);
+                clearLayers(this._npcmaps);
+                clearLayers(this._storemaps);
+                clearLayers(this._spawnmaps);
                 this._shopSubContainer = undefined;
                 this._spawnSubContainer = undefined;
                 // Reset location indices

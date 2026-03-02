@@ -26,6 +26,7 @@ export default void function (factory) {
 
                 this.getData(this.options.names, this.options.ids)
                 .then(locations => {
+                    if (!this._map) return;
                     this._icon_data = this.parseData(locations);
                     this._icons = {};
                     this._resetView();
@@ -440,6 +441,7 @@ export default void function (factory) {
                         return this.getData(this.options.name);
                     })
                     .then(locations => {
+                        if (!this._map) return;
                         this._icon_data = this.parseData(locations);
                         this._icons = {};
                         this._resetView();
@@ -744,6 +746,7 @@ export default void function (factory) {
             if (this.options.name) {
                 this.getData(this.options.name)
                     .then(locations => {
+                        if (!this._map) return;
                         this.createMarkers(locations);
                         // Call callback with found NPCs if provided
                         if (this.options.onNPCsLoaded && typeof this.options.onNPCsLoaded === 'function') {
@@ -752,7 +755,7 @@ export default void function (factory) {
                         }
                     }).catch(error => {
                         console.error('L.NPCs error:', error);
-                        this._map.addMessage('Error loading NPC data');
+                        if (this._map) this._map.addMessage('Error loading NPC data');
                     });
             }
         },
@@ -865,6 +868,7 @@ export default void function (factory) {
             if (this.options.name && this.options.name.trim()) {
                 this.getData(this.options.name)
                     .then(locations => {
+                        if (!this._map) return;
                         this.createMarkers(locations);
                         // Call callback with found objects if provided
                         if (this.options.onObjectsLoaded && typeof this.options.onObjectsLoaded === 'function') {
@@ -873,7 +877,7 @@ export default void function (factory) {
                         }
                     }).catch(error => {
                         console.error('L.Scenery error:', error);
-                        this._map.addMessage('Error loading scenery data');
+                        if (this._map) this._map.addMessage('Error loading scenery data');
                     });
             }
         },
