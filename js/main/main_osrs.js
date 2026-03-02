@@ -36,12 +36,19 @@ void function (global) {
         folder: "data_osrs"
     }).addTo(runescape_map);
 
+    // Expose for task panel and notify any listeners
+    window._regionControl = regionControl;
+    window.dispatchEvent(new CustomEvent('regionControlReady', { detail: regionControl }));
+
     // Unified search control for Objects, NPCs, and Shops
-    L.control.display.unifiedSearch({
+    let unifiedSearch = L.control.display.unifiedSearch({
         folder: "data_osrs",
         show3d: true,
         regionControl: regionControl
     }).addTo(runescape_map);
+
+    // Expose for task panel strategy
+    window._unifiedSearch = unifiedSearch;
 
     L.tileLayer.main('https://raw.githubusercontent.com/mejrs/layers_osrs/refs/heads/master/mapsquares/-1/{zoom}/{plane}_{x}_{y}.png', {
         minZoom: -4,

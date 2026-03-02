@@ -76,6 +76,16 @@ textarea {
 	filter: grayscale(100%);
 }
 
+.leaflet-control-region-button-text {
+	line-height: normal;
+	padding: 3px 6px;
+	font-size: 11px;
+	font-weight: bold;
+	color: #333;
+	min-width: 26px;
+	min-height: 26px;
+}
+
 .leaflet-control-region-icon {
 	width: 26px;
 	height: 26px;

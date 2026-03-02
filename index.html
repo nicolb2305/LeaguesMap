@@ -25,9 +25,24 @@
 	
 	<script type="module" src="js/layers.js"></script>
 	<script type="module" src="js/main/main_osrs.js"></script>
+	<script type="module" src="js/plugins/leaflet.tasks.js"></script>
 	
 	</head>
   <body>
-     <div id="map"></div>  
+    <div id="app-wrapper">
+      <div id="map"></div>
+      <div id="task-panel">
+        <div id="task-panel-header">
+          <span id="task-panel-title">League Tasks</span>
+          <input id="task-search" type="text" placeholder="Search tasks..." autocomplete="off" />
+          <label id="task-general-toggle">
+            <input type="checkbox" id="task-show-general" checked />
+            Show general tasks
+          </label>
+        </div>
+        <div id="task-panel-stats"></div>
+        <div id="task-list"></div>
+      </div>
+    </div>
   </body>
 </html>

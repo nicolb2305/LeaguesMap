@@ -335,6 +335,7 @@ export default void function (factory) {
                 { name: 'Karamja', icon: 'images/region_badges/Karamja_Area_Badge.png' },
                 { name: 'Kourend', icon: 'images/region_badges/Kourend_Area_Badge.png' },
                 { name: 'Misthalin', icon: 'images/region_badges/Misthalin_Area_Badge.png' },
+                { name: 'Morytania', icon: 'images/region_badges/Morytania_Area_Badge.png' },
                 { name: 'Tirannwn', icon: 'images/region_badges/Tirannwn_Area_Badge.png' },
                 { name: 'Varlamore', icon: 'images/region_badges/Varlamore_Area_Badge.png' },
                 { name: 'Wilderness', icon: 'images/region_badges/Wilderness_Area_Badge.png' },
@@ -367,9 +368,19 @@ export default void function (factory) {
                     button.classList.add('is-disabled');
                 }
 
-                let icon = L.DomUtil.create('img', 'leaflet-control-region-icon', button);
-                icon.src = region.icon;
-                icon.alt = region.name;
+                if (region.icon) {
+                    let icon = L.DomUtil.create('img', 'leaflet-control-region-icon', button);
+                    icon.src = region.icon;
+                    icon.alt = region.name;
+                    icon.onerror = () => {
+                        icon.remove();
+                        button.textContent = region.name;
+                        button.classList.add('leaflet-control-region-button-text');
+                    };
+                } else {
+                    button.textContent = region.name;
+                    button.classList.add('leaflet-control-region-button-text');
+                }
 
                 this._buttons[region.name] = button;
 
@@ -620,6 +631,7 @@ export default void function (factory) {
                     objects: objectsCheckbox.input,
                     strict: strictCheckbox.input
                 };
+                this._searchInput = nameInput;
                 this._regionControl = this.options.regionControl;
                 this._itemListContainer = null;
 
@@ -695,6 +707,18 @@ export default void function (factory) {
             _objectmap: undefined,
             _npcmap: undefined,
             _storemap: undefined,
+
+            // Programmatically trigger a search from external code (e.g. task panel).
+            // Sets the search input value, optionally enables strict mode, then runs the search.
+            triggerSearch: function (term, strict) {
+                if (!this._searchInput) return;
+                if (strict !== undefined && this._checkboxes) {
+                    this._checkboxes.strict.checked = !!strict;
+                }
+                this._searchInput.value = term;
+                // Fire an input event so internal listeners update state
+                this._searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            },
 
             performSearch: function (term) {
                 let regions = this._regionControl ? this._regionControl.getEnabledRegions() : [];
