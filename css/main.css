@@ -17,6 +17,32 @@ html, body {
     background-color: black;
 }
 
+#bug-report-btn {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 5px 14px;
+    background-color: #1e1500;
+    color: #e8d5a0;
+    border: 2px solid #8b0000;
+    border-radius: 4px;
+    font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    text-decoration: none;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    pointer-events: auto;
+}
+#bug-report-btn:hover {
+    background-color: #3a0000;
+    border-color: #cc0000;
+    color: #ffd700;
+}
+
 /* ── Task Panel ─────────────────────────────────────────────────── */
 #task-panel {
     flex: 0 0 380px;
@@ -334,9 +360,105 @@ img.huechange { filter: hue-rotate(120deg); }
 	width: 220px;
 }
 
+/* OSRS-themed popup */
+.osrs-popup .leaflet-popup-content-wrapper {
+	background-color: #1e1500;
+	border: 2px solid #6b4700;
+	border-radius: 4px;
+	color: #e8d5a0;
+	font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+	font-size: 13px;
+	box-shadow: 0 3px 12px rgba(0,0,0,0.6);
+}
+.osrs-popup .leaflet-popup-tip-container .leaflet-popup-tip {
+	background-color: #6b4700;
+}
+.osrs-popup .leaflet-popup-content {
+	color: #e8d5a0;
+	width: auto;
+}
+.osrs-popup .leaflet-popup-content b {
+	color: #ffd700;
+}
+.osrs-popup .leaflet-popup-content a {
+	color: #ffd700;
+	text-decoration: underline;
+}
+.osrs-popup .leaflet-popup-content a:hover {
+	color: #ffe84d;
+}
+.osrs-popup .leaflet-popup-close-button {
+	color: #a89060 !important;
+}
+.osrs-popup .leaflet-popup-close-button:hover {
+	color: #ffd700 !important;
+}
+.osrs-popup .popup-coords {
+	color: #a89060;
+	font-size: 11px;
+	margin-top: 4px;
+}
+.osrs-popup .popup-region {
+	color: #c8a840;
+	font-size: 11px;
+}
+.osrs-popup .popup-ground-spawn {
+	color: #e05050;
+	font-size: 11px;
+}
+
 .storeline-popup-wide .leaflet-popup-content {
 	width: auto !important;
 	max-width: 1000px;
+}
+
+/* ── Search control colours (no size/layout changes) ────────────── */
+/* Override Leaflet's default white background on the control box */
+.leaflet-control-layers.leaflet-control-display,
+.leaflet-control-layers-expanded.leaflet-control-display {
+	background-color: #1e1500;
+	color: #e8d5a0;
+}
+/* The inner expanded wrapper */
+.leaflet-control-display {
+	background-color: #1e1500;
+	color: #e8d5a0;
+}
+.leaflet-control-display label,
+.leaflet-control-display-label {
+	color: #e8d5a0;
+}
+/* Text input */
+.leaflet-control-display-input {
+	background-color: #111;
+	color: #e8d5a0;
+	border-color: #5a3f00;
+}
+.leaflet-control-display-input::placeholder { color: #7a6a40; }
+.leaflet-control-display-input:focus { border-color: #ffd700; }
+/* Checkboxes */
+.leaflet-control-display input[type="checkbox"] { accent-color: #ffd700; }
+/* Result list section headings */
+.leaflet-control-display-item-list-title { color: #ffd700; }
+/* Result list items */
+.leaflet-control-display-item-list-content { color: #7a6a40 !important; background-color: #1e1500; }
+.leaflet-control-display-item-list-item { color: #e8d5a0 !important; background-color: #1e1500; }
+.leaflet-control-display-item-list-item:hover { background-color: #2a1f00 !important; color: #ffd700 !important; }
+.leaflet-control-display-item-list-item.is-selected {
+	background-color: rgba(255,215,0,0.15) !important;
+	color: #ffd700 !important;
+}
+/* External link buttons */
+.leaflet-control-display-mejrs-btn,
+.leaflet-control-display-wiki-btn {
+	background-color: #2a1f00;
+	color: #ffd700;
+	border-color: #6b4700;
+}
+.leaflet-control-display-mejrs-btn:hover,
+.leaflet-control-display-wiki-btn:hover {
+	background-color: #3a2f00;
+	border-color: #ffd700;
 }
 
 .leaflet-control-message-container{

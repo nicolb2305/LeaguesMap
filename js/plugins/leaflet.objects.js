@@ -614,7 +614,7 @@ export default void function (factory) {
                 autoPan: false,
                 maxWidth: 1000,
                 minWidth: 200,
-                className: 'storeline-popup-wide'
+                className: 'osrs-popup storeline-popup-wide'
             });
 
             marker.on('popupopen', () => {
@@ -667,17 +667,15 @@ export default void function (factory) {
             if (items[0]["Sold by"]) {
                 let shopName = items[0]["Sold by"];
                 let wikiUrl = `https://oldschool.runescape.wiki/w/${shopName.replace(/ /g, '_')}`;
-                textfield += `<b><a href="${wikiUrl}" target="_blank" style="color: #0645ad;">${shopName}</a></b><br>`;
+                textfield += `<b><a href="${wikiUrl}" target="_blank">${shopName}</a></b><br>`;
             }
             if (items[0].Location) {
-                textfield += `Location: ${items[0].Location}<br>`;
+                textfield += `<span class="popup-region">Location: ${items[0].Location}</span><br>`;
             }
             if (items[0].LeagueRegion) {
-                textfield += `Region: ${items[0].LeagueRegion}<br>`;
+                textfield += `<span class="popup-region">Region: ${items[0].LeagueRegion}</span><br>`;
             }
-            textfield += `x = ${items[0].position.x}<br>`;
-            textfield += `y = ${items[0].position.y}<br>`;
-            textfield += `plane = ${items[0].position.plane}<br>`;
+            textfield += `<span class="popup-coords">x = ${items[0].position.x}, y = ${items[0].position.y}, plane = ${items[0].position.plane}</span><br>`;
             textfield += `<br><b>Items (${items.length}):</b><br>`;
 
             // Use the already calculated values for the HTML
@@ -690,7 +688,7 @@ export default void function (factory) {
                              this._searchQuery && 
                              storeItem["Display name"].toLowerCase().includes(this._searchQuery);
                 
-                let itemStyle = isMatch ? 'background-color: #ffffcc; padding: 4px; border-radius: 3px;' : '';
+                let itemStyle = isMatch ? 'background-color: rgba(255,215,0,0.15); border-left: 2px solid #ffd700; padding: 4px; border-radius: 3px;' : '';
                 
                 itemsHtml += `<div style="display: flex; align-items: center; gap: 8px; margin: 4px 0; break-inside: avoid; ${itemStyle}">`;
                 
@@ -827,17 +825,17 @@ export default void function (factory) {
                             })
                         });
 
-                        let popupContent = `<div style="min-width: 200px;">`;
-                        popupContent += `<b><a href="https://oldschool.runescape.wiki/w/${npc.page_name.replace(/ /g, '_')}" target="_blank" style="color: #0645ad;">${npc.page_name}</a></b><br>`;
+                        let popupContent = `<div class="osrs-popup-inner">`;
+                        popupContent += `<b><a href="https://oldschool.runescape.wiki/w/${npc.page_name.replace(/ /g, '_')}" target="_blank">${npc.page_name}</a></b><br>`;
                         if (npc.leagueregion && npc.leagueregion.length > 0) {
-                            popupContent += `Regions: ${npc.leagueregion.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ')}<br>`;
+                            popupContent += `<span class="popup-region">Regions: ${npc.leagueregion.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ')}</span><br>`;
                         }
-                        popupContent += `x = ${coord[0]}<br>`;
-                        popupContent += `y = ${coord[1]}<br>`;
+                        popupContent += `<span class="popup-coords">x = ${coord[0]}, y = ${coord[1]}</span><br>`;
                         popupContent += `</div>`;
 
                         marker.bindPopup(popupContent, {
-                            autoPan: false
+                            autoPan: false,
+                            className: 'osrs-popup'
                         });
 
                         this.addLayer(marker);
@@ -949,17 +947,17 @@ export default void function (factory) {
                             })
                         });
 
-                        let popupContent = `<div style="min-width: 200px;">`;
-                        popupContent += `<b><a href="https://oldschool.runescape.wiki/w/${obj.page_name.replace(/ /g, '_')}" target="_blank" style="color: #0645ad;">${obj.page_name}</a></b><br>`;
+                        let popupContent = `<div class="osrs-popup-inner">`;
+                        popupContent += `<b><a href="https://oldschool.runescape.wiki/w/${obj.page_name.replace(/ /g, '_')}" target="_blank">${obj.page_name}</a></b><br>`;
                         if (obj.leagueregion && obj.leagueregion.length > 0) {
-                            popupContent += `Regions: ${obj.leagueregion.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ')}<br>`;
+                            popupContent += `<span class="popup-region">Regions: ${obj.leagueregion.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ')}</span><br>`;
                         }
-                        popupContent += `x = ${coord[0]}<br>`;
-                        popupContent += `y = ${coord[1]}<br>`;
+                        popupContent += `<span class="popup-coords">x = ${coord[0]}, y = ${coord[1]}</span><br>`;
                         popupContent += `</div>`;
 
                         marker.bindPopup(popupContent, {
-                            autoPan: false
+                            autoPan: false,
+                            className: 'osrs-popup'
                         });
 
                         this.addLayer(marker);

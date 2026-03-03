@@ -60,7 +60,7 @@ function drawTaskPoints(task) {
     const coords = parseStrategyPoints(pointsStr);
     if (coords.length === 0) return;
 
-    const popupHtml = `<div style="min-width:180px;"><b>${escHtml(task.name)}</b><br>${escHtml(task.task)}</div>`;
+    const popupHtml = `<div class="osrs-popup-inner"><b>${escHtml(task.name)}</b><br><span style="color:#e8d5a0;">${escHtml(task.task)}</span></div>`;
 
     taskPointsLayer = L.layerGroup();
     coords.forEach(({ x, y }) => {
@@ -73,7 +73,7 @@ function drawTaskPoints(task) {
                 shadowSize: [41, 41]
             })
         });
-        marker.bindPopup(popupHtml, { autoPan: false });
+        marker.bindPopup(popupHtml, { autoPan: false, className: 'osrs-popup' });
         taskPointsLayer.addLayer(marker);
     });
     taskPointsLayer.addTo(map);

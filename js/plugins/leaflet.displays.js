@@ -77,13 +77,13 @@ export default void function (factory) {
                             opacity: 1,
                             fillOpacity: 0.85
                         });
-                        let popupContent = `<div style="min-width: 200px;">`;
-                        popupContent += `<b><a href="https://oldschool.runescape.wiki/w/${item.page_name.replace(/ /g, '_')}" target="_blank" style="color: #0645ad;">${item.page_name}</a></b> <span style="color:#cc0000;">(Ground spawn)</span><br>`;
+                        let popupContent = `<div class="osrs-popup-inner">`;
+                        popupContent += `<b><a href="https://oldschool.runescape.wiki/w/${item.page_name.replace(/ /g, '_')}" target="_blank">${item.page_name}</a></b> <span class="popup-ground-spawn">(Ground spawn)</span><br>`;
                         if (item.leagueregion && item.leagueregion.length > 0) {
-                            popupContent += `Regions: ${item.leagueregion.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ')}<br>`;
+                            popupContent += `<span class="popup-region">Regions: ${item.leagueregion.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ')}</span><br>`;
                         }
-                        popupContent += `x = ${coord[0]}<br>y = ${coord[1]}<br></div>`;
-                        marker.bindPopup(popupContent, { autoPan: false });
+                        popupContent += `<span class="popup-coords">x = ${coord[0]}, y = ${coord[1]}</span><br></div>`;
+                        marker.bindPopup(popupContent, { autoPan: false, className: 'osrs-popup' });
                         this.addLayer(marker);
                     });
                 }
@@ -591,6 +591,7 @@ export default void function (factory) {
                 
                 items.forEach(itemName => {
                     let listItem = L.DomUtil.create('div', 'leaflet-control-display-item-list-item', listContent);
+                    listItem.style.cssText = 'background-color: #1e1500; color: #e8d5a0;';
                     listItem.innerHTML = itemName;
                     listItem.setAttribute('data-item', itemName);
                     
@@ -717,7 +718,7 @@ export default void function (factory) {
                 let mejrsCol = L.DomUtil.create('div', '', checkboxRow);
                 mejrsCol.style.cssText = 'display: flex; align-items: center; flex-shrink: 0; gap: 5px;';
 
-                const btnStyle = 'display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 11px; white-space: nowrap; cursor: pointer; text-decoration: none; border: 1px solid #888; border-radius: 3px; background: #f5f0e8; color: #333;';
+                const btnStyle = 'display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 11px; white-space: nowrap; cursor: pointer; text-decoration: none; border-radius: 3px;';
 
                 let mejrsBtn = L.DomUtil.create('a', 'leaflet-control-display-mejrs-btn', mejrsCol);
                 mejrsBtn.setAttribute('target', '_blank');
@@ -995,7 +996,7 @@ export default void function (factory) {
                 listTitle.innerHTML = `<b>${label} (0)</b>`;
                 
                 let listContent = L.DomUtil.create('div', 'leaflet-control-display-item-list-content', container);
-                listContent.style.cssText = 'max-height: 300px; overflow-y: auto; padding: 0.7em; text-align: center; color: #999;';
+                listContent.style.cssText = 'max-height: 300px; overflow-y: auto; padding: 0.7em; text-align: center; background-color: #1e1500; color: #7a6a40;';
                 
                 if (enabled) {
                     listContent.innerHTML = 'Enter search term...';
@@ -1015,10 +1016,10 @@ export default void function (factory) {
                 listTitle.innerHTML = `<b>Shops (${items.length})</b>`;
 
                 let listContent = L.DomUtil.create('div', 'leaflet-control-display-item-list-content', container);
-                listContent.style.cssText = 'max-height: 300px; overflow-y: auto;';
+                listContent.style.cssText = 'max-height: 300px; overflow-y: auto; background-color: #1e1500;';
 
                 if (items.length === 0) {
-                    listContent.style.cssText += ' padding: 0.7em; text-align: center; color: #999;';
+                    listContent.style.cssText += ' padding: 0.7em; text-align: center; color: #7a6a40;';
                     listContent.innerHTML = 'No results';
                     return;
                 }
@@ -1028,6 +1029,7 @@ export default void function (factory) {
                     let locationCount = storeLocations.length;
 
                     let listItem = L.DomUtil.create('div', 'leaflet-control-display-item-list-item', listContent);
+                    listItem.style.cssText = 'background-color: #1e1500; color: #e8d5a0;';
                     listItem.innerHTML = `${itemName} (${locationCount})`;
                     listItem.setAttribute('data-item', itemName);
 
@@ -1074,16 +1076,17 @@ export default void function (factory) {
                 listTitle.innerHTML = `<b>Ground Items (${totalSpots})</b>`;
 
                 let listContent = L.DomUtil.create('div', 'leaflet-control-display-item-list-content', container);
-                listContent.style.cssText = 'max-height: 300px; overflow-y: auto;';
+                listContent.style.cssText = 'max-height: 300px; overflow-y: auto; background-color: #1e1500;';
 
                 if (spawnMap.size === 0) {
-                    listContent.style.cssText += ' padding: 0.7em; text-align: center; color: #999;';
+                    listContent.style.cssText += ' padding: 0.7em; text-align: center; color: #7a6a40;';
                     listContent.innerHTML = 'No results';
                     return;
                 }
 
                 [...spawnMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([name, coords]) => {
                     let listItem = L.DomUtil.create('div', 'leaflet-control-display-item-list-item', listContent);
+                    listItem.style.cssText = 'background-color: #1e1500; color: #e8d5a0;';
                     listItem.innerHTML = `${name} (${coords.length}) <span style="color:#cc0000; font-size:10px;">&#9679;</span>`;
                     listItem.setAttribute('data-item', name);
 
@@ -1117,10 +1120,10 @@ export default void function (factory) {
                 listTitle.innerHTML = `<b>NPCs (${totalEntries})</b>`;
                 
                 let listContent = L.DomUtil.create('div', 'leaflet-control-display-item-list-content', this._npcListContainer);
-                listContent.style.cssText = 'max-height: 300px; overflow-y: auto;';
+                listContent.style.cssText = 'max-height: 300px; overflow-y: auto; background-color: #1e1500;';
                 
                 if (totalEntries === 0) {
-                    listContent.style.cssText += ' padding: 0.7em; text-align: center; color: #999;';
+                    listContent.style.cssText += ' padding: 0.7em; text-align: center; color: #7a6a40;';
                     listContent.innerHTML = 'No results';
                     return;
                 }
@@ -1131,6 +1134,7 @@ export default void function (factory) {
                     let locationCount = coordinates.length;
                     
                     let listItem = L.DomUtil.create('div', 'leaflet-control-display-item-list-item', listContent);
+                    listItem.style.cssText = 'background-color: #1e1500; color: #e8d5a0;';
                     listItem.innerHTML = `${npc.page_name} (${locationCount})`;
                     
                     // Use unique key based on index
@@ -1173,10 +1177,10 @@ export default void function (factory) {
                 listTitle.innerHTML = `<b>Objects (${totalEntries})</b>`;
                 
                 let listContent = L.DomUtil.create('div', 'leaflet-control-display-item-list-content', this._objectListContainer);
-                listContent.style.cssText = 'max-height: 300px; overflow-y: auto;';
+                listContent.style.cssText = 'max-height: 300px; overflow-y: auto; background-color: #1e1500;';
                 
                 if (totalEntries === 0) {
-                    listContent.style.cssText += ' padding: 0.7em; text-align: center; color: #999;';
+                    listContent.style.cssText += ' padding: 0.7em; text-align: center; color: #7a6a40;';
                     listContent.innerHTML = 'No results';
                     return;
                 }
@@ -1187,6 +1191,7 @@ export default void function (factory) {
                     let locationCount = coordinates.length;
                     
                     let listItem = L.DomUtil.create('div', 'leaflet-control-display-item-list-item', listContent);
+                    listItem.style.cssText = 'background-color: #1e1500; color: #e8d5a0;';
                     listItem.innerHTML = `${obj.page_name} (${locationCount})`;
                     
                     // Use unique key based on index
