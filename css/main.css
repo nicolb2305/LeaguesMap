@@ -805,6 +805,87 @@ img.huechange { filter: hue-rotate(120deg); }
     margin-bottom: 4px;
 }
 
+/* Suggested locations from strategy.points */
+.planner-card-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px 4px;
+    border-top: 1px solid rgba(255, 215, 0, 0.1);
+    margin-bottom: 2px;
+}
+
+.planner-sugg-label {
+    font-size: 10px;
+    color: #7a6a40;
+    width: 100%;
+    margin-bottom: 1px;
+}
+
+.planner-sugg-btn {
+    font-size: 11px;
+    padding: 2px 7px;
+    background: #1a1200;
+    color: #c8b880;
+    border: 1px solid #3a2800;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.planner-sugg-btn:hover {
+    background: #2a2000;
+    border-color: #ffd700;
+    color: #ffd700;
+}
+.planner-sugg-btn.planner-sugg-active {
+    background: #2a2000;
+    border-color: #ffd700;
+    color: #ffd700;
+    font-weight: bold;
+}
+
+.planner-sugg-overflow {
+    display: none;
+    flex-wrap: wrap;
+    gap: 4px;
+    width: 100%;
+}
+.planner-sugg-overflow-open {
+    display: flex;
+}
+
+.planner-sugg-toggle {
+    font-size: 11px;
+    padding: 2px 7px;
+    background: none;
+    color: #7a6a40;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+    width: 100%;
+    text-align: left;
+    margin-top: 1px;
+}
+.planner-sugg-toggle:hover {
+    color: #ffd700;
+    border-color: #3a2800;
+}
+
+.planner-sugg-loading {
+    font-size: 14px;
+    color: #7a6a40;
+    animation: planner-spin 1s linear infinite;
+    display: inline-block;
+}
+
+@keyframes planner-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
 .planner-card-pin-row {
     display: flex;
     align-items: center;

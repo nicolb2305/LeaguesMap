@@ -1,6 +1,6 @@
 # TODO
 
-Show ground item icons instead of red dots
+
 automatically add pins for tasks
     Task has one location: add direct pin
     task has multiple locations

@@ -43,6 +43,7 @@ let pinningMode        = false;
 let pinningItemId      = null;
 let plannerPinsLayer   = null;
 let plannerLinesLayer  = null;
+let plannerSuggLayer   = null;   // orange suggestion-location pins for selected card
 let dragSrcId          = null;
 
 // ─── Persistence ──────────────────────────────────────────────────
@@ -66,12 +67,206 @@ function getTask(name) {
     return allTasksRef.find(t => t.name === name) || null;
 }
 
+// ─── Strategy location clustering ─────────────────────────────────
+const CLUSTER_RADIUS = 10;
+
+// Core clustering: accepts [{x,y}] coords, returns centroid clusters.
+function clusterCoords(coords) {
+    if (coords.length === 0) return [];
+    const assigned = new Array(coords.length).fill(false);
+    const clusters = [];
+    for (let i = 0; i < coords.length; i++) {
+        if (assigned[i]) continue;
+        const members = [coords[i]];
+        assigned[i] = true;
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (let j = 0; j < coords.length; j++) {
+                if (assigned[j]) continue;
+                const inRange = members.some(m =>
+                    Math.max(Math.abs(coords[j].x - m.x), Math.abs(coords[j].y - m.y)) <= CLUSTER_RADIUS
+                );
+                if (inRange) { members.push(coords[j]); assigned[j] = true; changed = true; }
+            }
+        }
+        const cx = Math.round(members.reduce((s, m) => s + m.x, 0) / members.length);
+        const cy = Math.round(members.reduce((s, m) => s + m.y, 0) / members.length);
+        clusters.push({ lat: cy + 0.5, lng: cx + 0.5, x: cx, y: cy, count: members.length });
+    }
+    return clusters;
+}
+
+// Sync: cluster strategy.points (explicit coords in the task JSON).
+function clusterStrategyPoints(task) {
+    if (!task || !task.strategy || !task.strategy.points) return [];
+    const raw = task.strategy.points.trim();
+    if (!raw || raw.toLowerCase() === 'n/a') return [];
+    const nums = raw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+    const coords = [];
+    for (let i = 0; i + 1 < nums.length; i += 2) coords.push({ x: nums[i], y: nums[i + 1] });
+    return clusterCoords(coords);
+}
+
+// ─── Async location lookup from data files ────────────────────────
+const _plannerJsonCache = {};
+async function _plannerFetchJson(url) {
+    if (_plannerJsonCache[url]) return _plannerJsonCache[url];
+    try { _plannerJsonCache[url] = await fetch(url).then(r => r.json()); }
+    catch (e) { _plannerJsonCache[url] = []; }
+    return _plannerJsonCache[url];
+}
+
+// Async: builds clusters from strategy.search by searching monsters +
+// item_spawns data files.  Falls back to strategy.points if that yields
+// nothing.  Respects the current enabled regions.
+async function loadSuggestedClusters(task) {
+    // Prefer explicit points first (sync, no fetch needed)
+    const staticClusters = clusterStrategyPoints(task);
+    if (staticClusters.length > 0) return staticClusters;
+
+    const searchTerm = task && task.strategy && task.strategy.search
+        ? task.strategy.search.trim() : '';
+    if (!searchTerm || searchTerm.toLowerCase() === 'n/a') return [];
+
+    const strict = !(task.strategy && task.strategy.no_strict);
+    const searchLower = searchTerm.toLowerCase();
+    const regions = window._regionControl ? window._regionControl.getEnabledRegions() : [];
+    const regionSet = regions.length > 0 ? new Set(regions.map(r => r.toLowerCase())) : null;
+
+    const [monsters, spawns] = await Promise.all([
+        _plannerFetchJson('data_osrs/monsters.json'),
+        _plannerFetchJson('data_osrs/item_spawns.json'),
+    ]);
+
+    const allCoords = [];
+    function extract(data) {
+        data.forEach(entry => {
+            if (!entry.page_name || !entry.coordinates) return;
+            const nl = entry.page_name.toLowerCase();
+            if (strict ? nl !== searchLower : !nl.includes(searchLower)) return;
+            if (regionSet) {
+                const er = entry.leagueregion || [];
+                if (er.length > 0 && !er.some(r => regionSet.has(r.toLowerCase()))) return;
+            }
+            entry.coordinates.forEach(c => allCoords.push({ x: Math.round(c[0]), y: Math.round(c[1]) }));
+        });
+    }
+    extract(monsters);
+    extract(spawns);
+
+    return clusterCoords(allCoords);
+}
+
+const SUGG_VISIBLE = 5; // how many location buttons to show before collapsing
+
+// Render suggestion buttons into the card's .planner-card-suggestions element
+// once the async data is ready.  Does nothing if the card has been removed.
+function renderSuggButtons(container, clusters, item) {
+    container.innerHTML = '';
+    if (clusters.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    const label = document.createElement('span');
+    label.className = 'planner-sugg-label';
+    label.textContent = 'Suggested location' + (clusters.length > 1 ? 's:' : ':');
+    container.appendChild(label);
+
+    const overflow = document.createElement('div');
+    overflow.className = 'planner-sugg-overflow';
+
+    clusters.forEach((c, i) => {
+        const isActive = item.pinCoords
+            && Math.abs(item.pinCoords.lng - c.lng) < 1
+            && Math.abs(item.pinCoords.lat - c.lat) < 1;
+        const countPart = c.count > 1 ? ` (${c.count}${clusters.length === 1 ? ' nearby' : ''})` : '';
+        const labelText = clusters.length === 1
+            ? `${c.x}, ${c.y}${countPart}`
+            : `${i + 1}: ${c.x}, ${c.y}${countPart}`;
+        const btn = document.createElement('button');
+        btn.className = 'planner-sugg-btn' + (isActive ? ' planner-sugg-active' : '');
+        btn.textContent = labelText;
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            item.pinCoords = { lat: c.lat, lng: c.lng };
+            savePlanner();
+            redrawMapOverlays();
+            renderPlanner();
+            if (plannerMap) plannerMap.setView([c.lat, c.lng], Math.max(plannerMap.getZoom(), 0));
+        });
+        if (i < SUGG_VISIBLE) {
+            container.appendChild(btn);
+        } else {
+            overflow.appendChild(btn);
+        }
+    });
+
+    if (overflow.childElementCount > 0) {
+        container.appendChild(overflow);
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'planner-sugg-toggle';
+        let expanded = false;
+        const update = () => {
+            const remaining = overflow.childElementCount;
+            toggleBtn.textContent = expanded
+                ? '▴ Show less'
+                : `▾ ${remaining} more…`;
+            overflow.classList.toggle('planner-sugg-overflow-open', expanded);
+        };
+        update();
+        toggleBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            expanded = !expanded;
+            update();
+        });
+        container.appendChild(toggleBtn);
+    }
+}
+
+async function populateSuggestionsAsync(item, task, card) {
+    const container = card.querySelector('.planner-card-suggestions');
+    if (!container) return;
+    const clusters = await loadSuggestedClusters(task);
+    // Card may have been replaced by a re-render — check it's still in the DOM
+    if (!card.isConnected) return;
+    renderSuggButtons(container, clusters, item);
+}
+
+// Emits the container shell; populateSuggestionsAsync always fills it.
+function buildSuggestionsHtml(item, task) {
+    if (item.virtual || !task) return '';
+    const hasSearch = task.strategy && task.strategy.search
+        && task.strategy.search.trim().toLowerCase() !== 'n/a';
+    const hasPoints = task.strategy && task.strategy.points
+        && task.strategy.points.trim().toLowerCase() !== 'n/a';
+    if (!hasSearch && !hasPoints) return '';
+    return '<div class="planner-card-suggestions"><span class="planner-sugg-label">Suggested locations:</span><span class="planner-sugg-loading">⟳</span></div>';
+}
+
 // ─── HTML escaping ────────────────────────────────────────────────
 function esc(str) {
     return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ─── SVG pin icon ─────────────────────────────────────────────────
+function makeSuggPinIcon() {
+    const svg = encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="30" viewBox="0 0 20 30">` +
+        `<path d="M10 0C4.5 0 0 4.5 0 10c0 6 10 20 10 20S20 16 20 10C20 4.5 15.5 0 10 0z" fill="#ff8800" stroke="#7a3000" stroke-width="1.5"/>` +
+        `<circle cx="10" cy="10" r="4" fill="#000" opacity="0.3"/>` +
+        `</svg>`
+    );
+    return window.L && L.icon({
+        iconUrl: 'data:image/svg+xml;charset=utf-8,' + svg,
+        iconSize:    [20, 30],
+        iconAnchor:  [10, 30],
+        popupAnchor: [0, -32],
+    });
+}
+
 function makePinIcon(color, number) {
     const numSvg = number != null
         ? `<text x="12" y="15" font-size="9" font-family="sans-serif" font-weight="bold" fill="#fff" text-anchor="middle">${number}</text>`
@@ -99,6 +294,7 @@ function redrawMapOverlays() {
 
     if (plannerPinsLayer)  { map.removeLayer(plannerPinsLayer);  plannerPinsLayer  = null; }
     if (plannerLinesLayer) { map.removeLayer(plannerLinesLayer); plannerLinesLayer = null; }
+    if (plannerSuggLayer)  { map.removeLayer(plannerSuggLayer);  plannerSuggLayer  = null; }
 
     const pinned = plannerItems
         .map((item, idx) => ({ item, idx, task: getTask(item.taskName) }))
@@ -165,6 +361,58 @@ function redrawMapOverlays() {
 
         plannerLinesLayer.addTo(map);
     }
+
+    // Suggestion pins drawn async after main layers are set
+    redrawSuggestionPins();
+}
+
+// ─── Suggestion location pins (shown when a card is selected) ─────
+async function redrawSuggestionPins() {
+    const L   = window.L;
+    const map = plannerMap;
+    if (!L || !map) return;
+    if (plannerSuggLayer) { map.removeLayer(plannerSuggLayer); plannerSuggLayer = null; }
+    if (!plannerSelectedId) return;
+
+    const item = plannerItems.find(i => i.id === plannerSelectedId);
+    if (!item || item.virtual) return;
+    const task = getTask(item.taskName);
+    if (!task) return;
+
+    const capturedSelectedId = plannerSelectedId;
+    const clusters = await loadSuggestedClusters(task);
+    if (!clusters.length || plannerSelectedId !== capturedSelectedId) return;
+
+    plannerSuggLayer = L.layerGroup();
+    const icon = makeSuggPinIcon();
+    if (!icon) return;
+
+    clusters.forEach((c, i) => {
+        const countPart = c.count > 1 ? ` (${c.count} nearby)` : '';
+        const labelText = clusters.length === 1
+            ? `${c.x}, ${c.y}${countPart}`
+            : `${i + 1}: ${c.x}, ${c.y}${countPart}`;
+        const marker = L.marker([c.lat, c.lng], { icon, zIndexOffset: 100 });
+        marker.bindPopup(
+            `<div class="osrs-popup-inner">` +
+            `<b>${esc(item.taskName)}</b><br>` +
+            `<span style="color:#ff8800;font-weight:bold;">Suggested location</span><br>` +
+            `<span class="popup-coords">${esc(labelText)}</span><br>` +
+            `<small style="color:#c8b880;">Click pin to set as task location</small>` +
+            `</div>`,
+            { autoPan: false, className: 'osrs-popup' }
+        );
+        marker.on('click', e => {
+            L.DomEvent.stopPropagation(e);
+            item.pinCoords = { lat: c.lat, lng: c.lng };
+            savePlanner();
+            redrawMapOverlays();
+            renderPlanner();
+        });
+        plannerSuggLayer.addLayer(marker);
+    });
+
+    plannerSuggLayer.addTo(map);
 }
 
 // ─── Pinning mode ─────────────────────────────────────────────────
@@ -392,6 +640,7 @@ function buildPlannerCard(item, task, pts, runPts, idx) {
         (isVirtual
             ? `<input class="planner-virtual-desc" value="${esc(item.customDesc || '')}" placeholder="Description (optional)..." data-id="${item.id}"/>`
             : (task ? `<div class="planner-card-desc">${esc(task.task)}</div>` : '')) +
+        buildSuggestionsHtml(item, task) +
         `<div class="planner-card-pin-row">` +
             `<button class="planner-pin-btn${item.pinCoords ? ' planner-pin-set' : ''}" data-id="${item.id}">${pinLabel}</button>` +
             (item.pinCoords ? `<button class="planner-pin-clear-btn" data-id="${item.id}" title="Clear pin">✕</button>` : '') +
@@ -401,6 +650,11 @@ function buildPlannerCard(item, task, pts, runPts, idx) {
             `<input class="planner-comment-input" type="text" placeholder="Add step/note..." data-id="${item.id}" autocomplete="off"/>` +
             `<button class="planner-comment-add-btn" data-id="${item.id}">＋</button>` +
         `</div>`;
+
+    // ── Suggested location buttons ────────────────────────────
+    if (!isVirtual && task) {
+        populateSuggestionsAsync(item, task, card);
+    }
 
     // ── Virtual name/desc inline editing ────────────────────────
     if (isVirtual) {
@@ -654,6 +908,12 @@ function setupTabSwitching() {
                 if (taskGenToggle) taskGenToggle.style.display = '';
                 if (taskSpawnsBtn) taskSpawnsBtn.style.display = '';
                 cancelPinning();
+                // Clear suggestion pins when leaving planner tab
+                plannerSelectedId = null;
+                if (plannerSuggLayer && plannerMap) {
+                    plannerMap.removeLayer(plannerSuggLayer);
+                    plannerSuggLayer = null;
+                }
             }
         });
     });
