@@ -9,6 +9,7 @@ on:
 
 jobs:
   e2e-core:
+    name: Core E2E (Chromium)
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
